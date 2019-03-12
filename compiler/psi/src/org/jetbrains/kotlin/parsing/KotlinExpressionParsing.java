@@ -1139,7 +1139,7 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
         }
 
         if (collapse) {
-            advanceLambdaBlock();
+            myKotlinParsing.advanceBalancedBlock();
             literal.done(FUNCTION_LITERAL);
             literalExpression.collapse(LAMBDA_EXPRESSION);
         }
@@ -1156,24 +1156,6 @@ public class KotlinExpressionParsing extends AbstractKotlinParsing {
         }
 
         myBuilder.restoreNewlinesState();
-    }
-
-    private void advanceLambdaBlock() {
-        int braceCount = 1;
-        while (!eof()) {
-            if (_at(LBRACE)) {
-                braceCount++;
-            }
-            else if (_at(RBRACE)) {
-                braceCount--;
-            }
-
-            advance();
-
-            if (braceCount == 0) {
-                break;
-            }
-        }
     }
 
     private boolean rollbackOrDropAt(PsiBuilder.Marker rollbackMarker, IElementType dropAt) {

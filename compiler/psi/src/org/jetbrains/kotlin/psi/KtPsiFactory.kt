@@ -850,7 +850,8 @@ class KtPsiFactory @JvmOverloads constructor(private val project: Project, val m
     }
 
     private class BlockWrapper(fakeBlockExpression: KtBlockExpression, private val expression: KtExpression) :
-        KtBlockExpression(fakeBlockExpression.node), KtPsiUtil.KtExpressionWrapper {
+        KtBlockExpression(fakeBlockExpression.text), KtPsiUtil.KtExpressionWrapper {
+
         override fun getStatements(): List<KtExpression> {
             return listOf(expression)
         }
