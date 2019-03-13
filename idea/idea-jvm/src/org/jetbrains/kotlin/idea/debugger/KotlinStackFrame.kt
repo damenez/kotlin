@@ -39,7 +39,6 @@ import com.intellij.xdebugger.frame.XValueChildrenList
 import com.sun.jdi.ObjectReference
 import com.sun.jdi.ReferenceType
 import com.sun.jdi.Type
-import com.sun.jdi.Value
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.AsmUtil.THIS
 import org.jetbrains.kotlin.codegen.DESTRUCTURED_LAMBDA_ARGUMENT_VARIABLE_PREFIX
@@ -250,9 +249,7 @@ class KotlinStackFrame(frame: StackFrameProxyImpl) : JavaStackFrame(StackFrameDe
         val allVisibleVariables = super.getStackFrameProxy().safeVisibleVariables()
 
         if (!kotlinVariableViewService.kotlinVariableView) {
-            return allVisibleVariables.map { variable ->
-                if (isFakeLocalVariableForInline(variable.name())) variable.wrapSyntheticInlineVariable() else variable
-            }
+            return allVisibleVariables.filter { !isFakeLocalVariableForInline(it.name()) }
         }
 
         val inlineDepth = VariableFinder.getInlineDepth(allVisibleVariables)
@@ -353,15 +350,6 @@ class KotlinStackFrame(frame: StackFrameProxyImpl) : JavaStackFrame(StackFrameDe
 
 private interface ThisLocalVariable {
     val label: String?
-}
-
-private fun LocalVariableProxyImpl.wrapSyntheticInlineVariable(): LocalVariableProxyImpl {
-    val proxyWrapper = object : StackFrameProxyImpl(frame.threadProxy(), frame.stackFrame, frame.indexFromBottom) {
-        override fun getValue(localVariable: LocalVariableProxyImpl): Value {
-            return frame.virtualMachine.mirrorOfVoid()
-        }
-    }
-    return LocalVariableProxyImpl(proxyWrapper, variable)
 }
 
 private fun getThisName(label: String): String {
