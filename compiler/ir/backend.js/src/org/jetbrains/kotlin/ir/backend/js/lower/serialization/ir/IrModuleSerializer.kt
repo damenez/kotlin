@@ -831,8 +831,6 @@ internal class IrModuleSerializer(
         return proto.build()
     }
 
-    private fun serializeIrTypeAlias(typeAlias: IrTypeAlias) = IrKlibProtoBuf.IrTypeAlias.newBuilder().build()
-
     private fun serializeIrValueParameter(parameter: IrValueParameter): IrKlibProtoBuf.IrValueParameter {
         val proto = IrKlibProtoBuf.IrValueParameter.newBuilder()
             .setSymbol(serializeIrSymbol(parameter.symbol))
@@ -1049,28 +1047,26 @@ internal class IrModuleSerializer(
         val declarator = IrKlibProtoBuf.IrDeclarator.newBuilder()
 
         when (declaration) {
-            is IrTypeAlias
-            -> declarator.irTypeAlias = serializeIrTypeAlias(declaration)
-            is IrAnonymousInitializer
-            -> declarator.irAnonymousInit = serializeIrAnonymousInit(declaration)
-            is IrConstructor
-            -> declarator.irConstructor = serializeIrConstructor(declaration)
-            is IrField
-            -> declarator.irField = serializeIrField(declaration)
-            is IrSimpleFunction
-            -> declarator.irFunction = serializeIrFunction(declaration)
-            is IrTypeParameter
-            -> declarator.irTypeParameter = serializeIrTypeParameter(declaration)
-            is IrVariable
-            -> declarator.irVariable = serializeIrVariable(declaration)
-            is IrValueParameter
-            -> declarator.irValueParameter = serializeIrValueParameter(declaration)
-            is IrClass
-            -> declarator.irClass = serializeIrClass(declaration)
-            is IrEnumEntry
-            -> declarator.irEnumEntry = serializeIrEnumEntry(declaration)
-            is IrProperty
-            -> declarator.irProperty = serializeIrProperty(declaration)
+            is IrAnonymousInitializer ->
+                declarator.irAnonymousInit = serializeIrAnonymousInit(declaration)
+            is IrConstructor ->
+                declarator.irConstructor = serializeIrConstructor(declaration)
+            is IrField ->
+                declarator.irField = serializeIrField(declaration)
+            is IrSimpleFunction ->
+                declarator.irFunction = serializeIrFunction(declaration)
+            is IrTypeParameter ->
+                declarator.irTypeParameter = serializeIrTypeParameter(declaration)
+            is IrVariable ->
+                declarator.irVariable = serializeIrVariable(declaration)
+            is IrValueParameter ->
+                declarator.irValueParameter = serializeIrValueParameter(declaration)
+            is IrClass ->
+                declarator.irClass = serializeIrClass(declaration)
+            is IrEnumEntry ->
+                declarator.irEnumEntry = serializeIrEnumEntry(declaration)
+            is IrProperty ->
+                declarator.irProperty = serializeIrProperty(declaration)
             else
             -> TODO("Declaration serialization not supported yet: $declaration")
         }
@@ -1104,7 +1100,6 @@ internal class IrModuleSerializer(
             .setFqName(serializeString(file.fqName.toString()))
 
         file.declarations.forEach {
-            if (it is IrTypeAlias) return@forEach
             if (it.descriptor.isExpectMember && !it.descriptor.isSerializableExpectClass) {
                 return@forEach
             }

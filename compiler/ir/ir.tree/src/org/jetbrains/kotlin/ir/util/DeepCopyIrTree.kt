@@ -105,15 +105,6 @@ open class DeepCopyIrTree : IrElementTransformerVoid() {
             superTypes.addAll(declaration.superTypes) // TODO
         }
 
-    override fun visitTypeAlias(declaration: IrTypeAlias): IrTypeAlias =
-        IrTypeAliasImpl(
-            declaration.startOffset, declaration.endOffset,
-            mapDeclarationOrigin(declaration.origin),
-            mapTypeAliasDeclaration(declaration.descriptor)
-        ).apply {
-            transformAnnotations(declaration)
-        }
-
     override fun visitSimpleFunction(declaration: IrSimpleFunction): IrFunction =
         IrFunctionImpl(
             declaration.startOffset, declaration.endOffset,
