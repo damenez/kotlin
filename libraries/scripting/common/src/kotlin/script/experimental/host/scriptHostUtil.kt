@@ -47,6 +47,11 @@ open class FileScriptSource(val file: File, private val preloadedText: String? =
     override val text: String by lazy { preloadedText ?: file.readText() }
     override val name: String? get() = file.name
     override val locationId: String? get() = file.path
+
+    override fun equals(other: Any?): Boolean =
+        (other as? FileScriptSource)?.let { preloadedText == it.preloadedText && file.absolutePath == it.file.absolutePath } == true
+
+    override fun hashCode(): Int = file.absolutePath.hashCode() + preloadedText.hashCode() * 23
 }
 
 /**
@@ -56,6 +61,11 @@ open class UrlScriptSource(override val externalLocation: URL) : ExternalSourceC
     override val text: String by lazy { externalLocation.readText() }
     override val name: String? get() = externalLocation.file
     override val locationId: String? get() = externalLocation.toString()
+
+    override fun equals(other: Any?): Boolean =
+        (other as? UrlScriptSource)?.let { externalLocation == it.externalLocation } == true
+
+    override fun hashCode(): Int = externalLocation.hashCode()
 }
 
 /**
@@ -71,6 +81,11 @@ open class StringScriptSource(val source: String, override val name: String? = n
     override val text: String get() = source
 
     override val locationId: String? = null
+
+    override fun equals(other: Any?): Boolean =
+        (other as? StringScriptSource)?.let { text == it.text && name == it.name && locationId == it.locationId } == true
+
+    override fun hashCode(): Int = text.hashCode() + name.hashCode() * 17 + locationId.hashCode() * 23
 }
 
 /**
