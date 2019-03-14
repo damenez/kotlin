@@ -9,17 +9,18 @@ package org.jetbrains.kotlin.idea.quickfix.crossLanguage
 import com.intellij.codeInsight.daemon.QuickFixBundle
 import com.intellij.lang.jvm.actions.ChangeParametersRequest
 import com.intellij.lang.jvm.actions.ExpectedParameter
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.JvmPsiConversionHelper
 import org.jetbrains.kotlin.asJava.elements.KtLightElement
-import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.descriptors.SourceElement
-import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
+import org.jetbrains.kotlin.idea.actions.generate.KotlinGenerateEqualsAndHashcodeAction
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.core.ShortenReferences
@@ -31,6 +32,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
+import org.jetbrains.kotlin.types.KotlinType
 
 internal class ChangeMethodParameters(
     target: KtNamedFunction,
@@ -60,16 +62,18 @@ internal class ChangeMethodParameters(
 
     override fun isAvailable(project: Project, editor: Editor?, file: KtFile): Boolean = element != null && request.isValid
 
+    private sealed class ParameterAction {
+        data class Keep(val ktParameter: KtParameter) : ParameterAction()
+        data class Add(val name: String, val ktType: KotlinType) : ParameterAction()
+    }
 
-    private fun getParameterDescriptors(
-        containingDeclaration: CallableDescriptor,
+    private fun getParametersActions(
+        target: KtNamedFunction,
         currentParameters: List<KtParameter>,
         expectedParameters: List<ExpectedParameter>,
         index: Int = 0,
-        collected: List<ValueParameterDescriptor> = ArrayList(expectedParameters.size)
-    ): List<ValueParameterDescriptor> {
-
-        val target = element ?: return emptyList()
+        collected: List<ParameterAction> = ArrayList(expectedParameters.size)
+    ): List<ParameterAction> {
 
         val currentHead = currentParameters.firstOrNull()
         val expectedHead = expectedParameters.firstOrNull() ?: return collected
@@ -77,14 +81,12 @@ internal class ChangeMethodParameters(
         if (expectedHead is ChangeParametersRequest.ExistingParameterWrapper) {
             val ktParameter = (expectedHead.existingParameter as? KtLightElement<*, *>)?.kotlinOrigin as? KtParameter
             if (ktParameter != null && ktParameter == currentHead)
-                return getParameterDescriptors(
-                    containingDeclaration,
+                return getParametersActions(
+                    target,
                     currentParameters.subList(1, currentParameters.size),
                     expectedParameters.subList(1, expectedParameters.size),
-                    index + 1,
-                    collected + (ktParameter.resolveToDescriptorIfAny(BodyResolveMode.FULL) as ValueParameterDescriptor).run {
-                        copy(newOwner = containingDeclaration, newIndex = index, newName = name)
-                    }
+                    index,
+                    collected.plusElement(ParameterAction.Keep(ktParameter))
                 )
             else
                 throw UnsupportedOperationException("processing of existing params in different order is not implemented yet")
@@ -96,34 +98,13 @@ internal class ChangeMethodParameters(
 
         val kotlinType = helper.convertType(theType).resolveToKotlinType(target.getResolutionFacade()) ?: return emptyList()
 
-
-        return getParameterDescriptors(
-            containingDeclaration,
+        return getParametersActions(
+            target,
             currentParameters,
             expectedParameters.subList(1, expectedParameters.size),
             index + 1,
-            collected + ValueParameterDescriptorImpl(
-                containingDeclaration, null, index, Annotations.EMPTY,
-                Name.identifier(expectedHead.semanticNames.firstOrNull() ?: "param$index"),
-                kotlinType, false,
-                false, false, null, SourceElement.NO_SOURCE
-            )
+            collected + ParameterAction.Add(expectedHead.semanticNames.firstOrNull() ?: "param$index", kotlinType)
         )
-
-
-//        val name = expectedHead.semanticNames.first()
-//        val psiType = helper.convertType(expectedHead.expectedTypes.first().theType)
-//        val newParameter = factory.createParameter(name, psiType)
-//
-//        for (annotationRequest in expectedHead.expectedAnnotations) {
-//            addAnnotationToModifierList(newParameter.modifierList!!, annotationRequest)
-//        }
-//
-//        if (currentHead == null)
-//            target.parameterList.add(newParameter)
-//        else
-//            target.parameterList.addBefore(newParameter, currentHead)
-
 
     }
 
@@ -133,6 +114,49 @@ internal class ChangeMethodParameters(
         val target = element ?: return
         val functionDescriptor = target.resolveToDescriptorIfAny(BodyResolveMode.FULL) ?: return
 
+        val parameterActions = getParametersActions(target, target.valueParameters, request.expectedParameters)
+
+        val parametersGenerated =
+            generateParameterList(
+                project,
+                functionDescriptor,
+                parameterActions.filterIsInstance<ParameterAction.Add>()
+            ).parameters.iterator()
+
+        val parametersMapped = parameterActions.map { action ->
+            when (action) {
+                is ParameterAction.Add -> action to parametersGenerated.next()
+                is ParameterAction.Keep -> action to action.ktParameter
+            }
+        }
+
+        val currentParameter = target.valueParameterList!!.parameters.iterator()
+
+        for ((action, parameter) in parametersMapped) {
+
+            when (action) {
+                is ParameterAction.Add ->
+                    target.valueParameterList!!.addParameter(parameter)
+
+                is ParameterAction.Keep ->
+                    if (!currentParameter.hasNext() || currentParameter.next() != parameter) {
+                        LOG.error("illegal state")
+                    }
+            }
+
+        }
+
+        currentParameter.forEach { it.delete() }
+
+//        val newParameterList = target.valueParameterList!!.replace(valueParameterList!!) as KtParameterList
+        ShortenReferences.DEFAULT.process(target.valueParameterList!!)
+    }
+
+    private fun generateParameterList(
+        project: Project,
+        functionDescriptor: FunctionDescriptor,
+        paramsToAdd: List<ParameterAction.Add>
+    ): KtParameterList {
         val newFunctionDescriptor = SimpleFunctionDescriptorImpl.create(
             functionDescriptor.containingDeclaration,
             functionDescriptor.annotations,
@@ -144,15 +168,14 @@ internal class ChangeMethodParameters(
                 functionDescriptor.extensionReceiverParameter?.copy(this),
                 functionDescriptor.dispatchReceiverParameter,
                 functionDescriptor.typeParameters,
-                getParameterDescriptors(this, target.valueParameters, request.expectedParameters),
- //               request.withIndex().map { (index, parameter) ->
-//                    ValueParameterDescriptorImpl(
-//                        this, null, index, Annotations.EMPTY,
-//                        Name.identifier(parameter.first.toString()),
-//                        parameter.second, false,
-//                        false, false, null, SourceElement.NO_SOURCE
-//                    )
-//                },
+                paramsToAdd.mapIndexed { index, parameter ->
+                    ValueParameterDescriptorImpl(
+                        this, null, index, Annotations.EMPTY,
+                        Name.identifier(parameter.name),
+                        parameter.ktType, false,
+                        false, false, null, SourceElement.NO_SOURCE
+                    )
+                },
                 functionDescriptor.returnType,
                 functionDescriptor.modality,
                 functionDescriptor.visibility
@@ -176,8 +199,7 @@ internal class ChangeMethodParameters(
             }
         }
 
-        val newParameterList = target.valueParameterList!!.replace(newFunction.valueParameterList!!) as KtParameterList
-        ShortenReferences.DEFAULT.process(newParameterList)
+        return newFunction.valueParameterList!!
     }
 
     companion object {
@@ -188,3 +210,5 @@ internal class ChangeMethodParameters(
 
 
 }
+
+private val LOG = Logger.getInstance(ChangeMethodParameters::class.java)
