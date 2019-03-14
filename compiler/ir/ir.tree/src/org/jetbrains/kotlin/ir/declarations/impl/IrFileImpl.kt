@@ -17,7 +17,6 @@
 package org.jetbrains.kotlin.ir.declarations.impl
 
 import org.jetbrains.kotlin.descriptors.PackageFragmentDescriptor
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationDescriptor
 import org.jetbrains.kotlin.ir.IrElementBase
 import org.jetbrains.kotlin.ir.SourceManager
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
@@ -29,7 +28,6 @@ import org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformer
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.utils.SmartList
 
 class IrFileImpl(
     override val fileEntry: SourceManager.FileEntry,
@@ -42,22 +40,18 @@ class IrFileImpl(
     constructor(
         fileEntry: SourceManager.FileEntry,
         symbol: IrFileSymbol
-    ) :
-            this(fileEntry, symbol, symbol.descriptor.fqName)
+    ) : this(fileEntry, symbol, symbol.descriptor.fqName)
 
     constructor(
         fileEntry: SourceManager.FileEntry,
         packageFragmentDescriptor: PackageFragmentDescriptor
-    ) :
-            this(fileEntry, IrFileSymbolImpl(packageFragmentDescriptor), packageFragmentDescriptor.fqName)
+    ) : this(fileEntry, IrFileSymbolImpl(packageFragmentDescriptor), packageFragmentDescriptor.fqName)
 
     constructor(
         fileEntry: SourceManager.FileEntry,
         packageFragmentDescriptor: PackageFragmentDescriptor,
-        fileAnnotations: List<AnnotationDescriptor>,
         declarations: List<IrDeclaration>
     ) : this(fileEntry, packageFragmentDescriptor) {
-        this.fileAnnotations.addAll(fileAnnotations)
         this.declarations.addAll(declarations)
     }
 
@@ -66,8 +60,6 @@ class IrFileImpl(
     }
 
     override val packageFragmentDescriptor: PackageFragmentDescriptor get() = symbol.descriptor
-
-    override val fileAnnotations: MutableList<AnnotationDescriptor> = SmartList()
 
     override val declarations: MutableList<IrDeclaration> = ArrayList()
 

@@ -80,7 +80,6 @@ open class DeepCopyIrTree : IrElementTransformerVoid() {
         IrFileImpl(
             mapFileEntry(declaration.fileEntry),
             mapPackageFragmentDescriptor(declaration.packageFragmentDescriptor),
-            declaration.fileAnnotations.toMutableList(),
             declaration.declarations.map { it.transform() }
         ).apply {
             transformAnnotations(declaration)
