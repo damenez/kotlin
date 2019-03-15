@@ -437,48 +437,9 @@ class KotlinElementActionsFactory : JvmElementActionsFactory() {
 
         override fun invoke(project: Project, editor: Editor?, file: PsiFile?) {
             val target = pointer.element ?: return
-            val annotationClass = JavaPsiFacade.getInstance(project).findClass(request.qualifiedName, target.resolveScope)
-
-            val kotlinAnnotation = annotationClass?.language == KotlinLanguage.INSTANCE
-
-            val annotationUseSiteTargetPrefix = run prefixEvaluation@{
-                if (annotationTarget == null) return@prefixEvaluation ""
-
-                val moduleDescriptor = (target as? KtDeclaration)?.resolveToDescriptorIfAny()?.module ?: return@prefixEvaluation ""
-                val annotationClassDescriptor = moduleDescriptor.resolveClassByFqName(
-                    FqName(request.qualifiedName), NoLookupLocation.FROM_IDE
-                ) ?: return@prefixEvaluation ""
-
-                val applicableTargetSet =
-                    AnnotationChecker.applicableTargetSet(annotationClassDescriptor) ?: KotlinTarget.DEFAULT_TARGET_SET
-
-                if (KotlinTarget.PROPERTY !in applicableTargetSet) return@prefixEvaluation ""
-
-                "${annotationTarget.renderName}:"
-            }
-
-            val entry = target.addAnnotationEntry(
-                KtPsiFactory(target)
-                    .createAnnotationEntry(
-                        "@$annotationUseSiteTargetPrefix${request.qualifiedName}${
-                        request.attributes.mapIndexed { i, p ->
-                            if (!kotlinAnnotation && i == 0 && p.name == "value")
-                                renderAttributeValue(p.value).toString()
-                            else
-                                "${p.name} = ${renderAttributeValue(p.value)}"
-                        }.joinToString(", ", "(", ")")
-                        }"
-                    )
-            )
-
+            val entry = addAnnotationEntry(target, request, annotationTarget)
             ShortenReferences.DEFAULT.process(entry)
         }
-
-        private fun renderAttributeValue(annotationAttributeRequest: AnnotationAttributeValueRequest) =
-            when (annotationAttributeRequest) {
-                is AnnotationAttributeValueRequest.PrimitiveValue -> annotationAttributeRequest.value
-                is AnnotationAttributeValueRequest.StringValue -> "\"" + annotationAttributeRequest.value + "\""
-            }
 
     }
 
@@ -487,6 +448,54 @@ class KotlinElementActionsFactory : JvmElementActionsFactory() {
         return listOfNotNull(ChangeMethodParameters.create(ktNamedFunction,request ))
     }
 }
+
+internal fun addAnnotationEntry(
+    target: KtModifierListOwner,
+    request: AnnotationRequest,
+    annotationTarget: AnnotationUseSiteTarget?
+): KtAnnotationEntry {
+    val annotationClass = JavaPsiFacade.getInstance(target.project).findClass(request.qualifiedName, target.resolveScope)
+
+    val kotlinAnnotation = annotationClass?.language == KotlinLanguage.INSTANCE
+
+    val annotationUseSiteTargetPrefix = run prefixEvaluation@{
+        if (annotationTarget == null) return@prefixEvaluation ""
+
+        val moduleDescriptor = (target as? KtDeclaration)?.resolveToDescriptorIfAny()?.module ?: return@prefixEvaluation ""
+        val annotationClassDescriptor = moduleDescriptor.resolveClassByFqName(
+            FqName(request.qualifiedName), NoLookupLocation.FROM_IDE
+        ) ?: return@prefixEvaluation ""
+
+        val applicableTargetSet =
+            AnnotationChecker.applicableTargetSet(annotationClassDescriptor) ?: KotlinTarget.DEFAULT_TARGET_SET
+
+        if (KotlinTarget.PROPERTY !in applicableTargetSet) return@prefixEvaluation ""
+
+        "${annotationTarget.renderName}:"
+    }
+
+    val entry = target.addAnnotationEntry(
+        KtPsiFactory(target)
+            .createAnnotationEntry(
+                "@$annotationUseSiteTargetPrefix${request.qualifiedName}${
+                request.attributes.mapIndexed { i, p ->
+                    if (!kotlinAnnotation && i == 0 && p.name == "value")
+                        renderAttributeValue(p.value).toString()
+                    else
+                        "${p.name} = ${renderAttributeValue(p.value)}"
+                }.joinToString(", ", "(", ")")
+                }"
+            )
+    )
+    return entry
+}
+
+private fun renderAttributeValue(annotationAttributeRequest: AnnotationAttributeValueRequest) =
+    when (annotationAttributeRequest) {
+        is AnnotationAttributeValueRequest.PrimitiveValue -> annotationAttributeRequest.value
+        is AnnotationAttributeValueRequest.StringValue -> "\"" + annotationAttributeRequest.value + "\""
+    }
+
 
 private fun PsiType.collectTypeParameters(): List<PsiTypeParameter> {
     val results = ArrayList<PsiTypeParameter>()
