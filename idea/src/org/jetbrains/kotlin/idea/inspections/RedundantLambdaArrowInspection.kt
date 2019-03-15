@@ -30,38 +30,49 @@ import org.jetbrains.kotlin.resolve.calls.util.isSingleUnderscore
 class RedundantLambdaArrowInspection : AbstractKotlinInspection() {
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
         return lambdaExpressionVisitor(fun(lambdaExpression: KtLambdaExpression) {
+            println("Point 1")
             val functionLiteral = lambdaExpression.functionLiteral
             val arrow = functionLiteral.arrow ?: return
+            println("Point 2")
             val parameters = functionLiteral.valueParameters
             val singleParameter = parameters.singleOrNull()
             if (parameters.isNotEmpty() && singleParameter?.isSingleUnderscore != true && singleParameter?.name != "it") {
                 return
             }
+            println("Point 3")
 
             if (lambdaExpression.getStrictParentOfType<KtWhenEntry>()?.expression == lambdaExpression) return
+            println("Point 4")
             if (lambdaExpression.getStrictParentOfType<KtContainerNodeForControlStructureBody>()?.let {
                     it.node.elementType in listOf(KtNodeTypes.THEN, KtNodeTypes.ELSE) && it.expression == lambdaExpression
                 } == true) return
+            println("Point 5")
 
             val callExpression = lambdaExpression.parent?.parent as? KtCallExpression
             if (callExpression != null) {
+                println("Point 6")
                 val callee = callExpression.calleeExpression as? KtNameReferenceExpression
                 if (callee != null && callee.getReferencedName() == "forEach" && singleParameter?.name != "it") return
             }
+            println("Point 7")
 
             val lambdaContext = lambdaExpression.analyze()
             if (parameters.isNotEmpty() && lambdaContext[BindingContext.EXPECTED_EXPRESSION_TYPE, lambdaExpression] == null) return
+            println("Point 8")
 
             val valueArgument = lambdaExpression.parent as? KtValueArgument
             val valueArgumentCall = valueArgument?.getStrictParentOfType<KtCallExpression>()
             if (valueArgumentCall?.isApplicableCall(lambdaExpression, lambdaContext) == false) return
+            println("Point 9")
 
             val functionLiteralDescriptor = functionLiteral.descriptor
             if (functionLiteralDescriptor != null) {
+                println("Point 10")
                 if (functionLiteral.anyDescendantOfType<KtNameReferenceExpression> {
                         it.text == "it" && it.resolveToCall()?.resultingDescriptor?.containingDeclaration != functionLiteralDescriptor
                     }) return
             }
+            println("Point 11")
 
             val startOffset = functionLiteral.startOffset
             holder.registerProblem(

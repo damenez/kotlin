@@ -1041,11 +1041,36 @@ fun <T : KtExpression> T.replaceWithCopyWithResolveCheck(
     preHook: T.() -> Unit = {},
     postHook: T.() -> T? = { this }
 ): T? {
+    println("Extra point 1")
     val originDescriptor = resolveStrategy(this, context) ?: return null
+    println("Extra point 2")
     @Suppress("UNCHECKED_CAST") val elementCopy = copy() as T
     elementCopy.preHook()
     val newContext = elementCopy.analyzeAsReplacement(this, context)
     val newDescriptor = resolveStrategy(elementCopy, newContext) ?: return null
+    println("Extra point 3")
+    println("Descriptors:\n$originDescriptor\n$newDescriptor")
+    println("Text:\n${originDescriptor.canonicalRender()}\n${newDescriptor.canonicalRender()}")
 
     return if (originDescriptor.canonicalRender() == newDescriptor.canonicalRender()) elementCopy.postHook() else null
 }
+/*Point 1
+Point 2
+Point 3
+Point 4
+Point 5
+Point 6
+Point 7
+Point 8
+Extra point 1
+Extra point 2
+Extra point 3
+Descriptors:
+public fun A.foo(f: (kotlin.String) -> kotlin.Unit): kotlin.Unit defined in root package in file it2.kt[SimpleFunctionDescriptorImpl@4ee21c50]
+public fun A.foo(f: (kotlin.String) -> kotlin.Unit): kotlin.Unit defined in root package in file it2.kt[SimpleFunctionDescriptorImpl@4ee21c50]
+Text:
+public fun A.foo(f: (kotlin.String) -> kotlin.Unit): kotlin.Unit defined in root package in file it2.kt
+public fun A.foo(f: (kotlin.String) -> kotlin.Unit): kotlin.Unit defined in root package in file it2.kt
+Point 9
+Point 10
+Point 11*/
