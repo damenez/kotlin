@@ -137,6 +137,7 @@ abstract class AbstractJvmRuntimeDescriptorLoaderTest : TestCaseWithTmpdir() {
 
     private fun createReflectedPackageView(classLoader: URLClassLoader, moduleName: String): SyntheticPackageViewForTest {
         val moduleData = RuntimeModuleData.create(classLoader)
+        // TODO: remove this usage and RuntimePackagePartProvider
         moduleData.packagePartProvider.registerModule(moduleName)
         val module = moduleData.module
 
