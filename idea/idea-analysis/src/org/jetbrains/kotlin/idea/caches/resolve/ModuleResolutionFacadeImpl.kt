@@ -16,6 +16,8 @@
 
 package org.jetbrains.kotlin.idea.caches.resolve
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.analyzer.AnalysisResult
@@ -24,6 +26,7 @@ import org.jetbrains.kotlin.container.getService
 import org.jetbrains.kotlin.container.tryGetService
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.idea.KotlinPluginUtil
 import org.jetbrains.kotlin.idea.caches.project.IdeaModuleInfo
 import org.jetbrains.kotlin.idea.project.ResolveElementCache
 import org.jetbrains.kotlin.idea.resolve.ResolutionFacade
@@ -54,6 +57,8 @@ internal class ModuleResolutionFacadeImpl(
     }
 
     override fun analyze(elements: Collection<KtElement>, bodyResolveMode: BodyResolveMode): BindingContext {
+        assertNoResolveUnderWriteAction()
+
         if (elements.isEmpty()) return BindingContext.EMPTY
         val resolveElementCache = getFrontendService(elements.first(), ResolveElementCache::class.java)
         return resolveElementCache.resolveToElements(elements, bodyResolveMode)
@@ -66,8 +71,10 @@ internal class ModuleResolutionFacadeImpl(
         return if (KtPsiUtil.isLocal(declaration)) {
             val bindingContext = analyze(declaration, bodyResolveMode)
             bindingContext[BindingContext.DECLARATION_TO_DESCRIPTOR, declaration]
-                    ?: getFrontendService(moduleInfo, AbsentDescriptorHandler::class.java).diagnoseDescriptorNotFound(declaration)
+                ?: getFrontendService(moduleInfo, AbsentDescriptorHandler::class.java).diagnoseDescriptorNotFound(declaration)
         } else {
+            assertNoResolveUnderWriteAction()
+
             val resolveSession = projectFacade.resolverForElement(declaration).componentProvider.get<ResolveSession>()
             resolveSession.resolveToDescriptor(declaration)
         }
@@ -93,6 +100,21 @@ internal class ModuleResolutionFacadeImpl(
 
     override fun <T : Any> getFrontendService(moduleDescriptor: ModuleDescriptor, serviceClass: Class<T>): T {
         return projectFacade.resolverForDescriptor(moduleDescriptor).componentProvider.getService(serviceClass)
+    }
+
+    private fun assertNoResolveUnderWriteAction() {
+        val application = ApplicationManager.getApplication() ?: return
+
+        if (!application.isWriteAccessAllowed) return
+
+        if (application.isUnitTestMode) return
+        if (application.isInternal && !KotlinPluginUtil.isSnapshotVersion()) return
+
+        LOG.error("Resolve is not allowed under the write action!")
+    }
+
+    companion object {
+        private val LOG = Logger.getInstance(ModuleResolutionFacadeImpl::class.java)
     }
 }
 
