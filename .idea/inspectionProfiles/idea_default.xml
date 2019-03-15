@@ -272,7 +272,7 @@
       <option name="ignoreAnonymousClassMethods" value="false" />
     </inspection_tool>
     <inspection_tool class="MissingRecentApi" enabled="true" level="ERROR" enabled_by_default="true">
-      <option name="sinceBuildString" value="181.3" />
+      <option name="sinceBuildString" value="181.3741.2" />
       <option name="untilBuildString" value="192.SNAPSHOT" />
     </inspection_tool>
     <inspection_tool class="MisspelledCompareTo" enabled="true" level="WARNING" enabled_by_default="true" />

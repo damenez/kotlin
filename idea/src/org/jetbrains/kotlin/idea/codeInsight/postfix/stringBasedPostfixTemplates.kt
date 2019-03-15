@@ -40,7 +40,7 @@ internal abstract class ConstantStringBasedPostfixTemplate(
     desc: String,
     private val template: String,
     selector: PostfixTemplateExpressionSelector
-) : StringBasedPostfixTemplate(name, desc, selector) {
+) : StringBasedPostfixTemplate(name, desc, selector, null) {
     override fun getTemplateString(element: PsiElement) = template
 
     override fun getElementToRemove(expr: PsiElement?) = expr
@@ -110,7 +110,7 @@ internal object KtReturnPostfixTemplate : ConstantStringBasedPostfixTemplate(
 internal object KtWhilePostfixTemplate : ConstantStringBasedPostfixTemplate(
     "while",
     "while (expr) {}",
-    "while (\$expr$) {\n\$END$\n}",
+    "while (\$expr$) {\n\n}",
     createExpressionSelector(statementsOnly = true, typePredicate = KotlinType::isBoolean)
 )
 
