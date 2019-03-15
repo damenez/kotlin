@@ -1073,4 +1073,6 @@ public fun A.foo(f: (kotlin.String) -> kotlin.Unit): kotlin.Unit defined in root
 public fun A.foo(f: (kotlin.String) -> kotlin.Unit): kotlin.Unit defined in root package in file it2.kt
 Point 9
 Point 10
-Point 11*/
+Point 11
+
+*/
